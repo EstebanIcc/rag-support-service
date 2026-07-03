@@ -3,13 +3,10 @@
  * Importa y registra aquí todos los módulos que quieras activar.
  */
 import { moduleRegistry }    from './registry.js';
-import { ticketModule }      from './examples/ticketModule.js';
-import { orderModule }       from './examples/orderModule.js';
 import { jelouTicketModule } from './examples/jelouTicketModule.js';
 
 // Registrar módulos activos
-moduleRegistry.register(ticketModule);
-moduleRegistry.register(orderModule);
+// ticketModule y orderModule desactivados — reemplazados por jelouTicketModule (consulta_ticket real)
 moduleRegistry.register(jelouTicketModule);
 
 export { moduleRegistry };
