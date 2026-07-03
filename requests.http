@@ -1,0 +1,47 @@
+# Ejemplos de uso del RAG Service
+# Compatible con REST Client (VS Code) o Insomnia/Postman
+
+@base = http://localhost:3000
+
+### Health check
+GET {{base}}/health
+
+### Ingestar una URL
+POST {{base}}/ingest/url
+Content-Type: application/json
+
+{
+  "url": "https://es.wikipedia.org/wiki/Inteligencia_artificial"
+}
+
+### Ingestar un PDF (usar form-data en Postman/Insomnia)
+# POST {{base}}/ingest/pdf
+# form-data: file = <tu-archivo.pdf>
+
+### Hacer una pregunta
+POST {{base}}/ask
+Content-Type: application/json
+
+{
+  "question": "¿Qué es la inteligencia artificial?",
+  "topK": 5
+}
+
+### Pregunta con historial de conversación
+POST {{base}}/ask
+Content-Type: application/json
+
+{
+  "question": "¿Y cuáles son sus aplicaciones?",
+  "topK": 5,
+  "history": [
+    { "role": "user", "content": "¿Qué es la inteligencia artificial?" },
+    { "role": "assistant", "content": "La inteligencia artificial es..." }
+  ]
+}
+
+### Listar documentos indexados
+GET {{base}}/documents
+
+### Eliminar un documento (reemplaza el ID)
+DELETE {{base}}/documents/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx

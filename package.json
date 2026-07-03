@@ -1,0 +1,22 @@
+{
+  "name": "rag-service",
+  "version": "1.0.0",
+  "description": "Servicio RAG con OpenAI para responder preguntas sobre documentos PDF y URLs",
+  "main": "src/app.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "node --watch src/app.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.0",
+    "cheerio": "^1.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.0",
+    "express": "^4.19.0",
+    "multer": "^1.4.5-lts.1",
+    "openai": "^4.52.0",
+    "pdf-parse": "^1.1.1",
+    "uuid": "^10.0.0"
+  }
+}

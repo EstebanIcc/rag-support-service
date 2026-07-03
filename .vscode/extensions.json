@@ -1,0 +1,8 @@
+{
+  "recommendations": [
+    "esbenp.prettier-vscode",
+    "dbaeumer.vscode-eslint",
+    "humao.rest-client",
+    "streetsidesoftware.code-spell-checker"
+  ]
+}
