@@ -68,6 +68,12 @@ function buildAgentPrompt({ question, ragContext, toolHistory, modules, conversa
     // Instrucción clara: responde la pregunta con los datos anteriores
     parts.push('=== TAREA ===');
     parts.push('Usando los DATOS OBTENIDOS EN TIEMPO REAL de arriba, responde la PREGUNTA DEL USUARIO de forma clara y concisa.');
+    const usedTicketTool = toolHistory.some((h) => h.success && h.tool === 'consulta_ticket');
+    if (usedTicketTool) {
+      parts.push('Para consulta_ticket: usa el formato formal por secciones con delimitadores, saltos de línea y emoticonos. Sigue la PLANTILLA DE RESPUESTA.');
+    } else {
+      parts.push('Si consulta_ticket incluye bloque de escalamiento, respétalo al cerrar tu respuesta.');
+    }
     parts.push('No busques más herramientas. Solo redacta la respuesta final al usuario.');
     parts.push('');
 
