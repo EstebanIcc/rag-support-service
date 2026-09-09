@@ -6,6 +6,30 @@ const httpsAgent = new https.Agent({ keepAlive: false });
 const DB_URL = 'https://api.jelou.ai/v2/databases/6500/rows';
 const ASSIGN_URL = 'https://api.jelou.ai/v1/support-tickets/assign';
 
+function getOperatorSessionId() {
+  return process.env.JELOU_OPERATOR_SESSION_ID || '-h71STBq1';
+}
+
+async function setOperatorStatus(status, operatorId) {
+  const url = 'https://api.jelou.ai/v1/operators/' + operatorId;
+  const body = { status, sessionId: getOperatorSessionId() };
+
+  console.log('[transferir_ticket_plataforma] PATCH operador', operatorId, '→', status);
+
+  const response = await axios.patch(url, body, {
+    timeout: 15000,
+    httpsAgent,
+    headers: {
+      ...getAuthHeader(),
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+  });
+
+  console.log('[transferir_ticket_plataforma] PATCH operador HTTP', response.status);
+  return response.data;
+}
+
 function getAuthHeader() {
   const token = process.env.JELOU_API_TOKEN;
   if (!token) {
@@ -55,9 +79,11 @@ function buildTransferSummary({ ticketId, supportTicketId, operatorId, assignRes
  * Módulo: transferir_ticket_plataforma
  *
  * Flujo:
- *   1. Busca el ticket en Jelou DB 6500 por Ticket
- *   2. Obtiene supportTicketId del registro (campo supportTicketId, NO _id)
- *   3. POST /v1/support-tickets/assign con origin=transfer
+ *   1. PATCH operador → status online
+ *   2. Busca el ticket en Jelou DB 6500 por Ticket
+ *   3. Obtiene supportTicketId del registro (campo supportTicketId, NO _id)
+ *   4. POST /v1/support-tickets/assign con origin=transfer
+ *   5. PATCH operador → status offline (siempre, en finally)
  */
 export const jelouTransferTicketModule = {
   name: 'transferir_ticket_plataforma',
@@ -92,86 +118,98 @@ export const jelouTransferTicketModule = {
     console.log('[transferir_ticket_plataforma] Ticket:', ticketId);
     console.log('[transferir_ticket_plataforma] operatorId:', operatorId);
 
-    // 1. Buscar ticket en DB 6500
-    const searchResponse = await axios.get(DB_URL, {
-      timeout: 15000,
-      httpsAgent,
-      params: { search: ticketId, searchBy: 'Ticket' },
-      headers: { ...getAuthHeader(), ...BASE_HEADERS },
-    });
+    // 0. Poner operador online antes de transferir
+    await setOperatorStatus('online', operatorId);
 
-    console.log('[transferir_ticket_plataforma] GET DB 6500 HTTP', searchResponse.status);
-    console.log('[transferir_ticket_plataforma] Resultados:', searchResponse.data?.pagination?.total ?? 0);
+    try {
+      // 1. Buscar ticket en DB 6500
+      const searchResponse = await axios.get(DB_URL, {
+        timeout: 15000,
+        httpsAgent,
+        params: { search: ticketId, searchBy: 'Ticket' },
+        headers: { ...getAuthHeader(), ...BASE_HEADERS },
+      });
 
-    const results = searchResponse.data?.results || [];
+      console.log('[transferir_ticket_plataforma] GET DB 6500 HTTP', searchResponse.status);
+      console.log('[transferir_ticket_plataforma] Resultados:', searchResponse.data?.pagination?.total ?? 0);
 
-    if (!results.length) {
-      return {
-        data: null,
-        summary: [
-          '=== RESULTADO TRANSFERENCIA A PLATAFORMA ===',
-          '',
-          '❌ Estado: No se pudo transferir',
-          '🎫 Ticket buscado: ' + ticketId,
-          '',
-          'No se encontró el ticket en la base de datos de plataforma (DB 6500).',
-          'Informa al usuario que el ticket no existe o no está disponible para transferencia.',
-        ].join('\n'),
+      const results = searchResponse.data?.results || [];
+
+      if (!results.length) {
+        return {
+          data: null,
+          summary: [
+            '=== RESULTADO TRANSFERENCIA A PLATAFORMA ===',
+            '',
+            '❌ Estado: No se pudo transferir',
+            '🎫 Ticket buscado: ' + ticketId,
+            '',
+            'No se encontró el ticket en la base de datos de plataforma (DB 6500).',
+            'Informa al usuario que el ticket no existe o no está disponible para transferencia.',
+          ].join('\n'),
+        };
+      }
+
+      const row = results[0];
+      console.log('[transferir_ticket_plataforma] Registro DB 6500 — Ticket:', row.Ticket, '| supportTicketId:', row.supportTicketId, '| _id (datum):', row._id);
+
+      const supportTicketId = pickSupportTicketId(row);
+
+      if (!supportTicketId) {
+        throw new Error(
+          'El ticket fue encontrado pero no tiene el campo supportTicketId. Registro: ' +
+            JSON.stringify(row),
+        );
+      }
+
+      console.log('[transferir_ticket_plataforma] supportTicketId:', supportTicketId);
+
+      // 2. Asignar / transferir en plataforma
+      const assignBody = {
+        origin: 'transfer',
+        operatorId,
+        supportTicketId: String(supportTicketId),
       };
-    }
 
-    const row = results[0];
-    console.log('[transferir_ticket_plataforma] Registro DB 6500 — Ticket:', row.Ticket, '| supportTicketId:', row.supportTicketId, '| _id (datum):', row._id);
+      console.log('[transferir_ticket_plataforma] POST assign body:', assignBody);
 
-    const supportTicketId = pickSupportTicketId(row);
+      const assignResponse = await axios.post(ASSIGN_URL, assignBody, {
+        timeout: 15000,
+        httpsAgent,
+        headers: {
+          ...getAuthHeader(),
+          ...BASE_HEADERS,
+          Accept: 'application/json',
+        },
+      });
 
-    if (!supportTicketId) {
-      throw new Error(
-        'El ticket fue encontrado pero no tiene el campo supportTicketId. Registro: ' +
-          JSON.stringify(row),
-      );
-    }
+      console.log('[transferir_ticket_plataforma] POST assign HTTP', assignResponse.status);
+      console.log('[transferir_ticket_plataforma] Respuesta:', JSON.stringify(assignResponse.data, null, 2));
 
-    console.log('[transferir_ticket_plataforma] supportTicketId:', supportTicketId);
-
-    // 2. Asignar / transferir en plataforma
-    const assignBody = {
-      origin: 'transfer',
-      operatorId,
-      supportTicketId: String(supportTicketId),
-    };
-
-    console.log('[transferir_ticket_plataforma] POST assign body:', assignBody);
-
-    const assignResponse = await axios.post(ASSIGN_URL, assignBody, {
-      timeout: 15000,
-      httpsAgent,
-      headers: {
-        ...getAuthHeader(),
-        ...BASE_HEADERS,
-        Accept: 'application/json',
-      },
-    });
-
-    console.log('[transferir_ticket_plataforma] POST assign HTTP', assignResponse.status);
-    console.log('[transferir_ticket_plataforma] Respuesta:', JSON.stringify(assignResponse.data, null, 2));
-
-    const summary = buildTransferSummary({
-      ticketId,
-      supportTicketId,
-      operatorId,
-      assignResponse: assignResponse.data,
-    });
-
-    return {
-      data: {
+      const summary = buildTransferSummary({
         ticketId,
         supportTicketId,
         operatorId,
-        assignResult: assignResponse.data,
-        ticketRow: row,
-      },
-      summary,
-    };
+        assignResponse: assignResponse.data,
+      });
+
+      return {
+        data: {
+          ticketId,
+          supportTicketId,
+          operatorId,
+          assignResult: assignResponse.data,
+          ticketRow: row,
+        },
+        summary,
+      };
+    } finally {
+      // Siempre poner operador offline al terminar (éxito o error)
+      try {
+        await setOperatorStatus('offline', operatorId);
+      } catch (err) {
+        console.error('[transferir_ticket_plataforma] Error poniendo operador offline:', err.message);
+      }
+    }
   },
 };
