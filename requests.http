@@ -40,6 +40,18 @@ Content-Type: application/json
   ]
 }
 
+### Transferir ticket a plataforma (intención detectada por el agente)
+POST {{base}}/ask
+Content-Type: application/json
+
+{
+  "question": "Por favor transfiere el ticket 20077 a la plataforma",
+  "referenceId": "593984703346"
+}
+
+### Listar módulos activos
+GET {{base}}/modules
+
 ### Listar documentos indexados
 GET {{base}}/documents
 
