@@ -5,6 +5,7 @@ import askRouter from './routes/ask.js';
 import ingestRouter from './routes/ingest.js';
 import documentsRouter from './routes/documents.js';
 import modulesRouter from './routes/modules.js';
+import { loadKnowledgeBase } from './knowledge/loadKnowledgeBase.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -40,17 +41,25 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ error: err.message || 'Error interno del servidor.' });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`\n🚀 RAG Service corriendo en http://localhost:${PORT}`);
   console.log(`\nEndpoints disponibles:`);
-  console.log(`  GET  /health            - Estado del servicio`);
-  console.log(`  POST /ask               - Hacer una pregunta al agente`);
-  console.log(`  POST /ingest/pdf        - Ingestar un PDF`);
-  console.log(`  POST /ingest/url        - Ingestar una URL`);
-  console.log(`  GET  /documents         - Listar documentos indexados`);
-  console.log(`  DELETE /documents/:id   - Eliminar un documento`);
-  console.log(`  GET  /modules           - Listar módulos activos`);
-  console.log(`  DELETE /modules/:name   - Desactivar un módulo\n`);
+  console.log(`  GET  /health             - Estado del servicio`);
+  console.log(`  POST /ask                - Hacer una pregunta al agente`);
+  console.log(`  POST /ingest/pdf         - Ingestar un PDF (multipart)`);
+  console.log(`  POST /ingest/url         - Ingestar una URL`);
+  console.log(`  POST /ingest/base64      - Ingestar un PDF en base64`);
+  console.log(`  GET  /documents          - Listar documentos indexados`);
+  console.log(`  DELETE /documents/:id    - Eliminar un documento`);
+  console.log(`  GET  /modules            - Listar módulos activos`);
+  console.log(`  DELETE /modules/:name    - Desactivar un módulo\n`);
+
+  // Cargar base de conocimiento desde PocketBase al iniciar
+  try {
+    await loadKnowledgeBase();
+  } catch (err) {
+    console.error('[app] Error al cargar knowledge base:', err.message);
+  }
 });
 
 export default app;

@@ -4,9 +4,10 @@
  */
 import { moduleRegistry }    from './registry.js';
 import { jelouTicketModule } from './examples/jelouTicketModule.js';
+import { jelouTransferTicketModule } from './examples/jelouTransferTicketModule.js';
 
 // Registrar módulos activos
-// ticketModule y orderModule desactivados — reemplazados por jelouTicketModule (consulta_ticket real)
 moduleRegistry.register(jelouTicketModule);
+moduleRegistry.register(jelouTransferTicketModule);
 
 export { moduleRegistry };

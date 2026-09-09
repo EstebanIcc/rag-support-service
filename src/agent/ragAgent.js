@@ -14,6 +14,14 @@ function getOpenAI() {
 
 const USE_JELOU_LLM = process.env.LLM_PROVIDER === 'jelou';
 
+/** Regla global: no inventar info fuera de docs.jelou.ai / herramientas / RAG */
+const DOCS_GROUNDING_RULES = [
+  '=== REGLA DE CONOCIMIENTO (docs.jelou.ai) ===',
+  'NO inventes información sobre Jelou, Brain, productos, procesos, configuraciones o procedimientos.',
+  'Responde sobre documentación/plataforma SOLO con lo que aparezca en CONTEXTO DOCUMENTAL (docs.jelou.ai indexados) o en DATOS OBTENIDOS EN TIEMPO REAL (herramientas).',
+  'Si no hay información suficiente en esas fuentes, dilo claramente. No completes con suposiciones ni conocimiento general.',
+].join('\n');
+
 // ── Construcción del prompt completo para Jelou ────────────────────────────
 
 /**
@@ -66,6 +74,8 @@ function buildAgentPrompt({ question, ragContext, toolHistory, modules, conversa
     }
 
     // Instrucción clara: responde la pregunta con los datos anteriores
+    parts.push(DOCS_GROUNDING_RULES);
+    parts.push('');
     parts.push('=== TAREA ===');
     parts.push('Usando los DATOS OBTENIDOS EN TIEMPO REAL de arriba, responde la PREGUNTA DEL USUARIO de forma clara y concisa.');
     const usedTicketTool = toolHistory.some((h) => h.success && h.tool === 'consulta_ticket');
@@ -124,10 +134,13 @@ function buildAgentPrompt({ question, ragContext, toolHistory, modules, conversa
   }
 
   // Instrucción clara: decide si necesitas una herramienta o puedes responder ya
+  parts.push(DOCS_GROUNDING_RULES);
+  parts.push('');
   parts.push('=== TAREA ===');
   parts.push('Analiza la PREGUNTA DEL USUARIO.');
   parts.push('- Si necesitas consultar una herramienta para responder con datos actualizados, úsala.');
-  parts.push('- Si ya puedes responder con el CONTEXTO DOCUMENTAL o con tu conocimiento, responde directamente.');
+  parts.push('- Si ya puedes responder con el CONTEXTO DOCUMENTAL (docs.jelou.ai), responde directamente.');
+  parts.push('- Si no hay contexto documental ni herramienta aplicable, responde que no tienes esa información en docs.jelou.ai.');
   parts.push('');
 
   // Formato de salida con los dos casos
@@ -253,12 +266,15 @@ export async function askAgent(question, { topK, conversationHistory = [] } = {}
   const model  = process.env.CHAT_MODEL || 'gpt-4o-mini';
   const tools  = moduleRegistry.toOpenAITools();
 
-  const SYSTEM_PROMPT = `Eres un asistente experto que responde preguntas combinando dos fuentes:
-1. CONTEXTO DOCUMENTAL: fragmentos de documentos indexados (PDFs, URLs).
-2. DATOS EN TIEMPO REAL: resultados de herramientas externas (tickets, pedidos, etc.)
+  const SYSTEM_PROMPT = `Eres un asistente experto de soporte Jelou que responde preguntas combinando dos fuentes:
+1. CONTEXTO DOCUMENTAL: fragmentos de docs.jelou.ai indexados (PDFs, URLs).
+2. DATOS EN TIEMPO REAL: resultados de herramientas externas (tickets, transferencias, etc.)
+
 Reglas:
+- NO inventes información sobre Jelou, Brain, productos, procesos o procedimientos.
+- Responde sobre documentación/plataforma SOLO con lo que esté en el CONTEXTO DOCUMENTAL o en datos de herramientas.
 - Usa AMBAS fuentes cuando estén disponibles. Prioriza los datos en tiempo real para información dinámica.
-- Si no tienes suficiente información en ninguna fuente, dilo claramente.
+- Si no tienes suficiente información en ninguna fuente, dilo claramente. No completes con suposiciones.
 - Sé conciso y preciso.
 - Responde en el mismo idioma en que se hace la pregunta.`;
 
